@@ -2,6 +2,6 @@
 this is discordbot
 ## how to work
 ```
-$ npm install
-$ node bot.js
+$ yarn install
+$ DISCORD_BOT_KEY=<discord api key> node bot.js
 ```
