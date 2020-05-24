@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discordbot-deployment
+  labels:
+    app: discordbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discordbot
+  template:
+    metadata:
+      labels:
+        app: discordbot
+    spec:
+      containers:
+      - name: discordbot
+        image: dudemcbacon/discordbot:latest
+        env:
+          - name: DISCORD_BOT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: discordbot
+                key: discord-bot-key

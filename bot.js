@@ -3,6 +3,10 @@ const Discord = require('discord.js');
 // const superagent = require('superagent');
 const Chance = require('chance');
 const winston = require('winston');
+const express = require('express');
+const multer = require('multer');
+
+const upload = multer();
 
 const client = new Discord.Client();
 const chance = new Chance();
@@ -21,6 +25,11 @@ if (process.env.DISCORD_BOT_KEY === undefined) {
   process.exit(1);
 }
 
+// Initialize express and define a port
+const app = express();
+const PORT = 3000;
+
+app.listen(PORT);
 
 // superagent
 // .get('http://10.0.10.26:7878/api/history?apikey=e848d68d67b44d2bb52703fff12b2f47&page=1&pageSize=100')
@@ -93,6 +102,14 @@ client.on('message', (msg) => {
     logger.info(`${msg.author.username} is danking it up: ${dankest}`);
     msg.channel.send(dankest);
   }
+});
+
+app.post('/hook', upload.none(), (req, res) => {
+  const payload = JSON.parse(req.body.payload);
+  logger.info(`Plex webhook received: ${payload.event}`);
+  const channel = client.channels.cache.get('713909279345606657');
+  channel.send(`Plex event received: ${payload.event}`);
+  res.send({ status: 'SUCCESS' });
 });
 
 client.login(process.env.DISCORD_BOT_KEY);

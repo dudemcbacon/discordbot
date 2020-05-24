@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: discordbot
+spec:
+  rules:
+    - host: discordbot.butt.reports
+      http:
+        paths:
+          - backend:
+              serviceName: discordbot
+              servicePort: 80
+            path: /
+
