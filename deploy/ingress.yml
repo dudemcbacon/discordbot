@@ -5,7 +5,7 @@ metadata:
   name: discordbot
 spec:
   rules:
-    - host: discordbot.butt.reports
+    - host: discordbot.butt.report
       http:
         paths:
           - backend:

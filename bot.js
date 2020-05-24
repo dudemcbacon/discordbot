@@ -55,11 +55,11 @@ const app = express();
 client.on('ready', () => {
   logger.info('Hello, CoolBot has logged into Discord!');
 
-  app.listen(port, () => logger.info(`CoolBot is listening for webhooks on port ${port}`));
 
   app.post('/hook', upload.none(), (req, res) => {
     const payload = JSON.parse(req.body.payload);
     logger.info(`Plex webhook received: ${payload.event}`);
+    logger.info(`Payload: ${JSON.stringify(payload)}`);
     const channel = client.channels.cache.get(plexChannel);
     channel.send(`Plex event received: ${payload.event}`);
     res.send({ status: 'SUCCESS' });
@@ -68,6 +68,8 @@ client.on('ready', () => {
   app.use('/live', health.LivenessEndpoint(healthcheck));
   app.use('/ready', health.ReadinessEndpoint(healthcheck));
   app.use('/health', health.HealthEndpoint(healthcheck));
+
+  app.listen(port, () => logger.info(`CoolBot is listening for webhooks on port ${port}`));
   // const j = schedule.scheduleJob('* * * * *', function(){
   // console.log("pooping");
   // client.channels.cache.get("460558427823800330").send("i poop every minute");
