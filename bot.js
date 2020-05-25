@@ -170,7 +170,7 @@ client.on('ready', () => {
         logger.info(`[DISCORD] Sending ${action} without image`);
         notifyDiscord(channel, image, payload, action);
       }
-    } else {
+    } else if ((payload.event === 'library.on.deck') || payload.event === 'library.new') {
       channel.send(`Received unhandled Plex event: ${payload.event}`);
       logger.info(`Payload: ${JSON.stringify(payload)}`);
     }
