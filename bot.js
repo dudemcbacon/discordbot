@@ -5,11 +5,14 @@ const Chance = require('chance');
 const winston = require('winston');
 const express = require('express');
 const multer = require('multer');
+const morgan = require('morgan');
+const sharp = require('sharp');
+const request = require('request-promise-native');
 const health = require('@cloudnative/health-connect');
 
 const healthcheck = new health.HealthChecker();
 
-const upload = multer();
+const upload = multer({ storage: multer.memoryStorage() });
 
 const client = new Discord.Client();
 const chance = new Chance();
@@ -39,7 +42,59 @@ const port = process.env.PORT;
 
 // Initialize express and define a port
 const app = express();
+app.use(morgan('dev'));
 
+function formatTitle(metadata) {
+  if (metadata.grandparentTitle) {
+    return metadata.grandparentTitle;
+  }
+
+  let ret = metadata.title;
+  if (metadata.year) {
+    ret += ` (${metadata.year})`;
+  }
+  return ret;
+}
+
+function formatSubtitle(metadata) {
+  let ret = '';
+
+  if (metadata.grandparentTitle) {
+    if (metadata.type === 'track') {
+      ret = metadata.parentTitle;
+    } else if (metadata.index && metadata.parentIndex) {
+      ret = `S${metadata.parentIndex} E${metadata.index}`;
+    } else if (metadata.originallyAvailableAt) {
+      ret = metadata.originallyAvailableAt;
+    }
+
+    if (metadata.title) {
+      ret += ` - ${metadata.title}`;
+    }
+  } else if (metadata.type === 'movie') {
+    ret = metadata.tagline;
+  }
+
+  return ret;
+}
+
+function notifyDiscord(channel, image, payload, action) {
+  const locationText = payload.Player.publicAddress;
+
+  const attachment = new Discord.MessageAttachment(image);
+  const embed = new Discord.MessageEmbed()
+    // Set the title of the field
+    .attachFiles([attachment])
+    .setTitle(formatTitle(payload.Metadata))
+    .setThumbnail('attachment://file.jpg')
+    // Set the color of the embed
+    .setColor(0xa67a2d)
+    // Set the main content of the embed
+    .setDescription(formatSubtitle(payload.Metadata))
+    .setFooter(`${action} by ${payload.Account.title} on ${payload.Player.title} from ${payload.Server.title} ${locationText}`, payload.Account.thumb);
+
+  channel.send(embed);
+}
 
 // superagent
 // .get('http://10.0.10.26:7878/api/history?apikey=e848d68d67b44d2bb52703fff12b2f47&page=1&pageSize=100')
@@ -56,14 +111,73 @@ client.on('ready', () => {
   logger.info('Hello, CoolBot has logged into Discord!');
 
 
-  app.post('/hook', upload.none(), (req, res) => {
+  /* eslint-disable consistent-return */
+  app.post('/hook', upload.single('thumb'), async (req, res) => {
     const payload = JSON.parse(req.body.payload);
     logger.info(`Plex webhook received: ${payload.event}`);
-    logger.info(`Payload: ${JSON.stringify(payload)}`);
     const channel = client.channels.cache.get(plexChannel);
-    channel.send(`Plex event received: ${payload.event}`);
+
+    const isVideo = (['movie', 'episode'].includes(payload.Metadata.type));
+    const isAudio = (payload.Metadata.type === 'track');
+
+    // missing required properties
+    if (!payload.user || !payload.Metadata || !(isAudio || isVideo)) {
+      return res.sendStatus(400);
+    }
+
+    // Get Image
+    let buffer;
+    let image;
+    if (req.file && req.file.buffer) {
+      buffer = req.file.buffer;
+    } else if (payload.thumb) {
+      logger.info('[REDIS]', `Retrieving image from  ${payload.thumb}`);
+      buffer = await request.get({
+        uri: payload.thumb,
+        encoding: null,
+      });
+    }
+    if (buffer) {
+      image = await sharp(buffer)
+        .resize({
+          height: 75,
+          width: 75,
+          fit: 'contain',
+          background: 'white',
+        })
+        .toBuffer();
+    }
+
+    // post to slack
+    if ((payload.event === 'media.scrobble' && isVideo) || payload.event === 'media.rate') {
+      let action;
+
+      if (payload.event === 'media.scrobble') {
+        action = 'played';
+      } else if (payload.rating > 0) {
+        action = 'rated ';
+        for (let i = 0; i < payload.rating / 2; i += 1) {
+          action += ':star:';
+        }
+      } else {
+        action = 'unrated';
+      }
+
+      if (image) {
+        logger.info(`[DISCORD] Sending ${action} with image`);
+        notifyDiscord(channel, image, payload, action);
+      } else {
+        logger.info(`[DISCORD] Sending ${action} without image`);
+        notifyDiscord(channel, image, payload, action);
+      }
+    } else {
+      channel.send(`Received unhandled Plex event: ${payload.event}`);
+      logger.info(`Payload: ${JSON.stringify(payload)}`);
+    }
+
     res.send({ status: 'SUCCESS' });
   });
+  /* eslint-enable consistent-return */
 
   app.use('/live', health.LivenessEndpoint(healthcheck));
   app.use('/ready', health.ReadinessEndpoint(healthcheck));
