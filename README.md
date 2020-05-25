@@ -3,5 +3,5 @@ this is discordbot
 ## how to work
 ```
 $ yarn install
-$ DISCORD_BOT_KEY=<discord api key> node bot.js
+$ PORT=<express port> PLEX_CHANNEL=<plex channel id> DISCORD_BOT_KEY=<discord api key> node bot.js
 ```

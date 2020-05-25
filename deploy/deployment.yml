@@ -23,5 +23,7 @@ spec:
               secretKeyRef:
                 name: discordbot
                 key: discord-bot-key
+          - name: PLEX_CHANNEL
+            value: '713909279345606657'
           - name: PORT
             value: '80'
