@@ -26,6 +26,12 @@ const logger = winston.createLogger({
   ],
 });
 
+logger.stream = {
+  write: (message) => {
+    logger.info(message, { logtype: 'access' });
+  },
+};
+
 const plexChannel = '713909279345606657';
 
 if (process.env.DISCORD_BOT_KEY === undefined) {
@@ -42,7 +48,7 @@ const port = process.env.PORT;
 
 // Initialize express and define a port
 const app = express();
-app.use(morgan('dev'));
+app.use(morgan('combined', { stream: logger.stream }));
 
 function formatTitle(metadata) {
   if (metadata.grandparentTitle) {
@@ -79,7 +85,17 @@ function formatSubtitle(metadata) {
 }
 
 function notifyDiscord(channel, image, payload, action) {
-  const locationText = payload.Player.publicAddress;
+  let locationText = '';
+  if (payload.Player) {
+    locationText = payload.Player.publicAddress;
+  }
+
+  let footer = '';
+  if (action === 'added') {
+    footer = `${action} by ${payload.Account.title} on ${payload.Server.title} ${locationText}`;
+  } else {
+    footer = `${action} by ${payload.Account.title} on ${payload.Player.title} from ${payload.Server.title} ${locationText}`;
+  }
 
   const attachment = new Discord.MessageAttachment(image);
   const embed = new Discord.MessageEmbed()
@@ -91,7 +107,7 @@ function notifyDiscord(channel, image, payload, action) {
     .setColor(0xa67a2d)
     // Set the main content of the embed
     .setDescription(formatSubtitle(payload.Metadata))
-    .setFooter(`${action} by ${payload.Account.title} on ${payload.Player.title} from ${payload.Server.title} ${locationText}`, payload.Account.thumb);
+    .setFooter(footer);
 
   channel.send(embed);
 }
@@ -149,11 +165,15 @@ client.on('ready', () => {
     }
 
     // post to slack
-    if ((payload.event === 'media.scrobble' && isVideo) || payload.event === 'media.rate') {
+    if ((payload.event === 'media.scrobble' && isVideo)
+        || (payload.event === 'library.new' && isVideo)
+        || payload.event === 'media.rate') {
       let action;
 
       if (payload.event === 'media.scrobble') {
         action = 'played';
+      } else if (payload.event === 'library.new') {
+        action = 'added';
       } else if (payload.rating > 0) {
         action = 'rated ';
         for (let i = 0; i < payload.rating / 2; i += 1) {
