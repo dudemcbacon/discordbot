@@ -12,7 +12,9 @@
     "request-promise-native": "^1.0.8",
     "sharp": "^0.25.3",
     "superagent": "^5.2.2",
-    "winston": "^3.2.1"
+    "superagent-debugger": "^1.2.9",
+    "winston": "^3.2.1",
+    "xml2js": "^0.4.23"
   },
   "devDependencies": {
     "eslint": "6.8.0",
